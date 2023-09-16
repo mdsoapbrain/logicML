@@ -1,4 +1,11 @@
-```markdown
+
+
+# Overview
+The logicML pipeline is a comprehensive  class that facilitates the process of training and evaluating machine learning models using the H2O AutoML framework. This class is especially tailored for studies focused on analyzing the relationship between Fecal Immunochemical Test (FIT) results and histology types, such as colonrectal cancer, advance adenoma and normal. It provides a structured framework for researchers to understand the predictive importance of various factors in determining histology outcomes based on FIT values.
+
+It is particularly designed for binary classification problems, and includes functionalities for data preparation, model training, evaluation, and feature importance analysis, among others. Its unique feature lies in its ability to ensemble predictions using various logic gates, allowing for flexibility in combining model predictions. This makes it exceptionally suited for studies where understanding the interaction between different predictive models can provide deeper insights into the underlying phenomena.
+
+
 # logicML Pipeline
 
 The `logicML` package offers a Python class, `logicML`, that facilitates streamlined machine learning model training and evaluation utilizing the H2O AutoML library. The package encompasses a rich set of methods for data preparation, training, evaluating, and visualizing the performance of the models using various charts and metrics.
@@ -46,7 +53,6 @@ import pandas as pd
 # Load your data (replace with your actual data paths)
 train_df = pd.read_csv('path/to/your/train_data.csv')
 test_df = pd.read_csv('path/to/your/test_data.csv')
-```
 
 ### Step 2: Initialize the Pipeline
 
@@ -84,10 +90,10 @@ Your `train_df` and `test_df` should adhere to the following format:
 ### Example:
 
 ```plaintext
-| Feature1 | Feature2 | ... | FeatureN | Target_var|
-|----------|----------|-----|----------|-----------|
-| 1.1      | 2.2      | ... | 3.3      | 0         |
-| 4.4      | 5.5      | ... | 6.6      | 1         |
+| Feature1 | Feature2 | ... | FeatureN |FIT(remove_var)| Target_var|
+|----------|----------|-----|----------|---------------|-----------|
+| 1.1      | 2.2      | ... | 3.3      | 100           | 1         |
+| 4.4      | 5.5      | ... | 6.6      | 12            | 0         |
 ```
 
 ## Class Methods
