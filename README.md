@@ -84,10 +84,10 @@ Your `train_df` and `test_df` should adhere to the following format:
 ### Example:
 
 ```plaintext
-| Feature1 | Feature2 | ... | FeatureN | remove_var | target_var |
-|----------|----------|-----|----------|------------|------------|
-| 1.1      | 2.2      | ... | 3.3      | 0          | 1          |
-| 4.4      | 5.5      | ... | 6.6      | 1          | 0          |
+| Feature1 | Feature2 | ... | FeatureN | Target_var|
+|----------|----------|-----|----------|-----------|
+| 1.1      | 2.2      | ... | 3.3      | 0         |
+| 4.4      | 5.5      | ... | 6.6      | 1         |
 ```
 
 ## Class Methods
