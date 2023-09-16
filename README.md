@@ -12,7 +12,7 @@ Before installing the `logicML` package, ensure you have Python 3.6 or later ins
 Clone the repository to your local machine using the following command:
 
 ```bash
-git clone https://github.com/mdsoupbrain/logicML.git
+git clone https://github.com/mdsoapbrain/logicML.git
 ```
 
 ### Step 2: Install Dependencies
