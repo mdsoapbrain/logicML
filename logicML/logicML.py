@@ -10,15 +10,25 @@ import seaborn as sns
 
 
 class logicML:
-    
     def __init__(self, train_df, test_df, target_var='Histology group', remove_var='FIT 1', max_models=20, seed=124):
-        self.train_df = train_df
-        self.test_df = test_df
+        # Ensure test_df is a pandas DataFrame
+        if not isinstance(test_df, pd.DataFrame):
+            try:
+                self.test_df = pd.DataFrame(test_df)
+            except:
+                raise ValueError("test_df could not be converted to a pandas DataFrame.")
+        else:
+            self.test_df = test_df
+            
+        self.train_df = train_df  # Initialize train_df as a class attribute
         self.target_var = target_var
         self.remove_var = remove_var
         self.max_models = max_models
         self.seed = seed
         self.initialize_h2o()
+        self.target_fpr = 0.2  # Set the default target FPR
+        self.target_tpr = 0.8  # Set the default target TPR
+
         
     def initialize_h2o(self):
         h2o.init()
@@ -60,6 +70,10 @@ class logicML:
         fpr, tpr, thresholds = roc_curve(y_true, y_scores)
         roc_auc = auc(fpr, tpr)
         
+        # Store fpr and tpr as class attributes
+        self.fpr = fpr
+        self.tpr = tpr
+
         plt.plot(fpr, tpr, label='ROC curve (AUC = %0.2f)' % roc_auc)
         plt.plot([0, 1], [0, 1], 'k--')
         plt.xlabel('False Positive Rate')
@@ -94,22 +108,41 @@ class logicML:
         plt.legend(loc="lower right")
         plt.show()
 
-    def ensemble_predictions(self, y_true, pred1, pred2, threshold1, threshold2):
+
+
+    def ensemble_predictions(self, y_true, pred1, pred2, threshold1, threshold2, logic_gate='or'):
         y_pred1 = (pred1 > threshold1).astype(int)
         y_pred2 = (pred2 > threshold2).astype(int)
-        y_pred_union = np.logical_or(y_pred1, y_pred2)
+        
+        if logic_gate == 'or':
+            y_pred_union = np.logical_or(y_pred1, y_pred2)
+        elif logic_gate == 'and':
+            y_pred_union = np.logical_and(y_pred1, y_pred2)
+        elif logic_gate == 'xor':
+            y_pred_union = np.logical_xor(y_pred1, y_pred2)
+        elif logic_gate == 'nand':
+            y_pred_union = np.logical_not(np.logical_and(y_pred1, y_pred2))
+        elif logic_gate == 'nor':
+            y_pred_union = np.logical_not(np.logical_or(y_pred1, y_pred2))
+        elif logic_gate == 'xnor':
+            y_pred_union = np.logical_not(np.logical_xor(y_pred1, y_pred2))
+        else:
+            raise ValueError("Invalid logic gate specified. Use 'or', 'and', 'xor', 'nand', 'nor', or 'xnor'.")
+        
+        # Note that we removed the hard-coded 'or' operation from here
         accuracy1 = accuracy_score(y_true, y_pred1)
         accuracy2 = accuracy_score(y_true, y_pred2)
         accuracy_union = accuracy_score(y_true, y_pred_union)
         TN, FP, FN, TP = confusion_matrix(y_true, y_pred_union).ravel()
         specificity = TN / (TN + FP)
         sensitivity = TP / (TP + FN)
-        print(f"Accuracy of model 1: {accuracy1 * 100:.2f}%")
+        print(f"Accuracy of FIT model: {accuracy1 * 100:.2f}%")
         print(f"Accuracy of model 2: {accuracy2 * 100:.2f}%")
         print(f"Accuracy of ensemble model: {accuracy_union * 100:.2f}%")
         print(f"Specificity of ensemble model: {specificity * 100:.2f}%")
         print(f"Sensitivity of ensemble model: {sensitivity * 100:.2f}%")
         return y_pred_union, accuracy_union, specificity, sensitivity
+
 
 
 
@@ -160,12 +193,35 @@ class logicML:
         
         return y_v15_pred2, best_threshold
 
-    def permutation_and_combination(self, varimp, n, train, target, test, test_df, y_pred1):
-        """Perform permutations and combinations on the top N important features to find the best feature set."""
+    def permutation_and_combination(self, varimp, n, m, train, target, test, test_df, y_pred1):
+        """Perform combinations on the top N important features to find the best feature set, selecting M features to find the best combination at a time. (sort via AUC score)
+
+        Args:
+        varimp: list of tuples
+            The variable importances obtained from a trained model.
+        n: int
+            The number of top features to consider for generating combinations.
+        m: int
+            The number of features to select in each combination.
+        train: H2OFrame
+            The training data.
+        target: str
+            The target variable name.
+        test: H2OFrame
+            The testing data.
+        test_df: pandas DataFrame
+            The testing data in pandas DataFrame format for easy manipulation in Python.
+        y_pred1: pandas Series/1D array
+            The predictions of a baseline model to combine with the predictions from the new model trained on the subset of features.
+
+        Returns:
+        results: list of tuples
+            A list of feature combinations and their corresponding AUCs, sorted in descending order of AUC.
+        """
         top_n_var = [row[0] for row in varimp[:n]]
         
         results = []
-        combinations = itertools.combinations(top_n_var, 3)
+        combinations = itertools.combinations(top_n_var, m)
         
         for combination in combinations:
             col_indices = [train.names.index(var) for var in combination]
@@ -196,6 +252,7 @@ class logicML:
         plt.show()
         
         return results
+
 
     def roc_and_confusion_matrix(self, results, train, test, test_df, y_pred1, target='Histology group'):
         """Plot the ROC curve and confusion matrix for the best combination of features found."""
@@ -232,9 +289,41 @@ class logicML:
         plt.title('Confusion Matrix')
         plt.show()
 
-class AutoMLPipeline:
-    
-    # ... (other methods remain unchanged)
+    def plot_fit_manual_roc(self, target_fpr=None, target_tpr=None):
+        """Plot the ROC curve for manual FIT predictions and determine the best threshold based on target FPR and TPR."""
+        from sklearn.metrics import roc_curve, auc
+        import matplotlib.pyplot as plt
+        import numpy as np
+
+        y_true = self.train_df[self.target_var].values
+        y_scores = self.train_df['FIT 1'].values
+
+        fpr, tpr, thresholds = roc_curve(y_true, y_scores)
+        roc_auc = auc(fpr, tpr)
+
+        plt.plot(fpr, tpr, label='ROC curve (AUC = %0.2f)' % roc_auc)
+        plt.plot([0, 1], [0, 1], 'k--', label='Random Guess')
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        plt.title('ROC Curve for FIT Manual')
+        plt.legend()
+        plt.show()
+        
+        # If target FPR and TPR are not provided, use the default values
+        if target_fpr is None:
+            target_fpr = self.target_fpr
+        if target_tpr is None:
+            target_tpr = self.target_tpr
+
+        idx = np.argmin(np.abs(fpr - target_fpr) + np.abs(tpr - target_tpr))
+        self.fit_threshold = thresholds[idx]
+        print(f"Selected Threshold: {self.fit_threshold}")
+
+
+    def fit_manual_prediction(self):
+        """Generate manual FIT predictions using the determined threshold."""
+        self.test_df['FIT_manual_pred'] = (self.test_df['FIT 1'] > self.fit_threshold).astype(int)
+
 
     def stage_one(self):
         """
@@ -247,6 +336,8 @@ class AutoMLPipeline:
         train, test, x, y = self.prepare_data()
         aml = self.train_model(train, x, y)
         preds = self.evaluate_model(aml, test, x, y)
+        self.plot_fit_manual_roc()  # You can specify target_fpr and target_tpr here if known
+        self.fit_manual_prediction()  # Generating FIT manual predictions using the threshold determined above
         thresholds = self.plot_roc_curve(self.test_df[self.target_var], preds['p1'])
 
         # Save necessary data for use in later stages
@@ -266,7 +357,7 @@ class AutoMLPipeline:
         - Accepts a threshold parameter with a default value of 'best', which uses the optimal threshold
         """
         if threshold == 'best':
-            threshold = self.thresholds[np.argmax(self.tpr - self.fpr)]  # Modify to correctly get the best threshold
+            threshold = self.thresholds[np.argmax(self.tpr - self.fpr)]  # Now correctly gets the best threshold using self.tpr and self.fpr
 
         varimp = self.get_variable_importance(self.aml.leader)
         y_pred1, best_threshold = self.train_with_topn_features(varimp, 10, self.train, self.y, self.test, self.test_df, self.preds['p1'])
