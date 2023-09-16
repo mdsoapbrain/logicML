@@ -99,8 +99,4 @@ The `logicML` class contains several methods that facilitate various steps in th
 ## Contributing
 
 Contributions to improve the package are welcome. Feel free to open an issue or create a pull request.
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 ```
